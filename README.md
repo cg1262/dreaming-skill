@@ -35,6 +35,11 @@ machine, for the two memory files these CLIs actually maintain:
   Codex, using their normal model + normal judgment) — reading the SKILL.md's
   instructions like any other skill. There's no separate dedicated model or
   hosted pipeline behind this.
+- **Reports include computed evidence, not just a model summary.** After writing
+  the dream file, the skill runs a real `diff -u` against the original memory
+  file and includes that literal unified diff in the report. If the original
+  memory file does not exist yet, the diff uses an empty `/dev/null` baseline;
+  very large diffs are capped with an explicit truncation note.
 - **The "locate transcripts" step is a small deterministic script**, not a
   model call — see [Mechanism notes](#mechanism-notes) for why, and exactly
   what it does and doesn't do.
@@ -106,6 +111,15 @@ Replaced: "uses npm" -> "uses pnpm" (contradicted in the 2026-07-11 session
   where the build was migrated).
 Added: "OG images are generated at build time via Satori, not client-side."
 Wrote: /home/cgamb/gambill-data-website/CLAUDE.dream.20260715-143022.md
+
+Computed diff:
+--- /home/cgamb/gambill-data-website/CLAUDE.md
++++ /home/cgamb/gambill-data-website/CLAUDE.dream.20260715-143022.md
+@@ -1,3 +1,3 @@
+ # Project memory
+-Uses npm for package scripts.
++Uses pnpm for package scripts.
+ OG images are generated at build time via Satori, not client-side.
 
 Review it, then promote manually if it looks right:
   mv CLAUDE.dream.20260715-143022.md CLAUDE.md

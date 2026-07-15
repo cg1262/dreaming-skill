@@ -119,12 +119,48 @@ until the path is free.
 
 ## Step 4: Report back
 
-Print a short summary for the user, covering:
+Print a short prose summary for the user, covering:
 - how many transcripts were read and over what time span
 - what was merged (duplicate groups collapsed)
 - what was replaced/updated as stale, and why (cite the contradicting
   transcript if relevant)
 - what new insights were added
+
+Then run a real unified diff and include its literal, computed output in the
+user-facing report. Set `ORIGINAL_MEMORY_FILE` to the `AGENTS.md` path from
+Step 1, even if it did not exist, and set `DREAM_FILE` to the new dream file
+path from Step 3. Run exactly this shell step:
+
+```bash
+DIFF_TMP="$(mktemp)"
+if [ -f "$ORIGINAL_MEMORY_FILE" ]; then
+  diff -u -- "$ORIGINAL_MEMORY_FILE" "$DREAM_FILE" > "$DIFF_TMP" || true
+else
+  diff -u \
+    --label "$ORIGINAL_MEMORY_FILE (missing; empty baseline)" \
+    --label "$DREAM_FILE" \
+    /dev/null "$DREAM_FILE" > "$DIFF_TMP" || true
+fi
+
+DIFF_LIMIT_BYTES=20000
+DIFF_BYTES="$(wc -c < "$DIFF_TMP" | tr -d ' ')"
+if [ "$DIFF_BYTES" -eq 0 ]; then
+  printf '%s\n' '(diff produced no output; files are identical)'
+elif [ "$DIFF_BYTES" -le "$DIFF_LIMIT_BYTES" ]; then
+  cat "$DIFF_TMP"
+else
+  head -c "$DIFF_LIMIT_BYTES" "$DIFF_TMP"
+  printf '\n[diff truncated: %s bytes total, showing first %s bytes]\n' "$DIFF_BYTES" "$DIFF_LIMIT_BYTES"
+fi
+rm -f "$DIFF_TMP"
+```
+
+Show that output under a `Computed diff` heading as a fenced `diff` block. Do
+not paraphrase or alter it except for the truncation already performed by the
+shell step. The `|| true` is intentional: `diff` exits with status 1 when files
+differ, and that must not stop the reporting flow.
+
+The final report must also include:
 - the exact path of the new dream file
 - explicit next step: *"Review `AGENTS.dream.<ts>.md`. If it looks right,
   promote it yourself with `mv <path>/AGENTS.dream.<ts>.md <path>/AGENTS.md`.
