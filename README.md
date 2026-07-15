@@ -199,13 +199,17 @@ inspecting this machine and Claude Code's own docs (not assumed):
   a single OS syscall, so there is no window in which a second, concurrent
   invocation could observe the same name as free. If the create fails
   because the name is taken (e.g. two dreams launched in the same second),
-  it retries with an incrementing suffix (`-2`, `-3`, ...) until an atomic
-  create succeeds, so two simultaneous runs against the same directory are
-  guaranteed distinct filenames — this is an actual guarantee enforced by
-  the OS, not a "please check first" instruction to the model. This closes
-  a gap flagged in review: filename selection used to be prompt-only
-  (`SKILL.md` telling the model to check for an existing dream file and
-  pick another name), which was a check-then-write race, not an atomic one.
+  it retries with an incrementing suffix (`-2`, `-3`, ...) and tries again,
+  up to a bounded number of attempts (1,000,000) that exists purely as an
+  infinite-loop guard against a bug in the script, not as a realistic limit
+  — a personal, single-user tool will never see anywhere near that many
+  same-second collisions against one directory. Within that bound, two
+  simultaneous runs against the same directory are guaranteed distinct
+  filenames — an actual guarantee enforced by the OS, not a "please check
+  first" instruction to the model. This closes a gap flagged in review:
+  filename selection used to be prompt-only (`SKILL.md` telling the model to
+  check for an existing dream file and pick another name), which was a
+  check-then-write race, not an atomic one.
 
 ## Limitations / things to know
 

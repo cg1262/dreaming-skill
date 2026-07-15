@@ -10,7 +10,11 @@ window between "does this exist?" and "create it" for a second process to
 land in, because the OS performs both as one syscall. If the timestamp-based
 name is already taken (e.g. two runs within the same second), it
 deterministically retries with an incrementing numeric suffix (-2, -3, ...)
-until an atomic create succeeds.
+until an atomic create succeeds. The retry loop is bounded (see
+`max_attempts` below), but only as a defensive fallback against a genuine
+bug (e.g. an infinite loop) — the bound is high enough that no real
+same-second collision count for a single-user tool like this one could ever
+reach it.
 
 Prints the reserved (now-existing, empty) file path to stdout. The caller
 is expected to then overwrite that file's contents with the actual dream
@@ -35,7 +39,7 @@ from datetime import datetime
 from pathlib import Path
 
 
-def reserve_dream_path(directory: Path, base: str, max_attempts: int = 1000) -> Path:
+def reserve_dream_path(directory: Path, base: str, max_attempts: int = 1_000_000) -> Path:
     """Atomically create and return a unique dream file path.
 
     Each candidate is created with os.open(..., O_CREAT | O_EXCL), which
@@ -45,6 +49,13 @@ def reserve_dream_path(directory: Path, base: str, max_attempts: int = 1000) -> 
     exploit. On collision, the next candidate is tried; this always
     terminates because each losing attempt corresponds to a distinct
     process having just won that exact path.
+
+    max_attempts is not a realistic ceiling — it's an infinite-loop guard
+    against a genuine bug in this function. Reaching a million same-second
+    collisions against one directory cannot happen in normal use of a
+    personal, single-user tool; if it's ever hit, something is broken (e.g.
+    this function looping without actually creating files) and raising is
+    the right behavior rather than spinning forever.
     """
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     for attempt in range(1, max_attempts + 1):
@@ -58,7 +69,9 @@ def reserve_dream_path(directory: Path, base: str, max_attempts: int = 1000) -> 
         return candidate
     raise RuntimeError(
         f"could not reserve a dream file path under {directory} for base "
-        f"{base!r} after {max_attempts} attempts"
+        f"{base!r} after {max_attempts} attempts — this indicates a bug "
+        f"(e.g. this loop not actually creating files), not real-world "
+        f"contention"
     )
 
 
