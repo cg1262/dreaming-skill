@@ -31,6 +31,11 @@ machine, for the two memory files these CLIs actually maintain:
   write to `CLAUDE.md`/`AGENTS.md`, only to a new
   `CLAUDE.dream.<timestamp>.md` / `AGENTS.dream.<timestamp>.md` file. You
   promote it yourself (`mv CLAUDE.dream.<ts>.md CLAUDE.md`) or delete it.
+- **The dream filename is reserved atomically, not just picked by the
+  model.** Choosing *which* new filename to write to is a small deterministic
+  script (`next_dream_path.py`), not a check-then-write prompt instruction —
+  see [Mechanism notes](#mechanism-notes) for exactly what guarantee that
+  does and doesn't provide.
 - **The synthesis is done by whichever agent runs the skill** (Claude Code or
   Codex, using their normal model + normal judgment) — reading the SKILL.md's
   instructions like any other skill. There's no separate dedicated model or
@@ -47,7 +52,8 @@ dreaming-skill/
 ├── install.sh                       # symlinks the two skill dirs into place
 ├── scripts/
 │   ├── find_claude_project.py       # locate CLAUDE.md + recent transcripts
-│   └── find_codex_project.py        # locate AGENTS.md + recent transcripts
+│   ├── find_codex_project.py        # locate AGENTS.md + recent transcripts
+│   └── next_dream_path.py           # atomically reserve a unique dream filename
 ├── claude-code/
 │   └── dreaming/
 │       ├── SKILL.md                 # -> ~/.claude/skills/dreaming/SKILL.md
@@ -58,9 +64,10 @@ dreaming-skill/
         └── scripts -> ../../scripts  (symlink)
 ```
 
-Both `SKILL.md` files reference the same two helper scripts (via a symlink
+Both `SKILL.md` files reference the same three helper scripts (via a symlink
 into the shared `scripts/` directory) so there's one implementation of the
-mechanical lookup logic, not two copies to keep in sync.
+mechanical lookup and filename-reservation logic, not two copies to keep in
+sync.
 
 ## Install
 
@@ -185,12 +192,30 @@ inspecting this machine and Claude Code's own docs (not assumed):
   lines carry the raw model/tool payloads (including injected system
   instructions) that the helper script deliberately skips.
 
+- **The dream filename is reserved with an atomic exclusive-create, not a
+  check-then-write.** `next_dream_path.py` picks a candidate name
+  (`<base>.dream.<YYYYMMDD-HHMMSS>.md`) and creates it via
+  `os.open(path, os.O_CREAT | os.O_EXCL)` — existence-check and creation are
+  a single OS syscall, so there is no window in which a second, concurrent
+  invocation could observe the same name as free. If the create fails
+  because the name is taken (e.g. two dreams launched in the same second),
+  it retries with an incrementing suffix (`-2`, `-3`, ...) until an atomic
+  create succeeds, so two simultaneous runs against the same directory are
+  guaranteed distinct filenames — this is an actual guarantee enforced by
+  the OS, not a "please check first" instruction to the model. This closes
+  a gap flagged in review: filename selection used to be prompt-only
+  (`SKILL.md` telling the model to check for an existing dream file and
+  pick another name), which was a check-then-write race, not an atomic one.
+
 ## Limitations / things to know
 
-- The helper scripts are read-only and mechanical: they locate files and
-  strip transcripts down to plain conversational text. All actual judgment
-  (merging, staleness resolution, what counts as a durable insight) is done
-  by the invoking agent per the SKILL.md instructions — there is no
+- `find_claude_project.py` and `find_codex_project.py` are read-only and
+  mechanical: they locate files and strip transcripts down to plain
+  conversational text. `next_dream_path.py` has exactly one side effect — it
+  creates the single empty file whose path it prints, to hold its atomic
+  reservation. None of the three scripts do any summarization: all actual
+  judgment (merging, staleness resolution, what counts as a durable insight)
+  is done by the invoking agent per the SKILL.md instructions — there is no
   standalone "dream" model or algorithm here.
 - Claude Code's project-directory encoding (`/` → `-`) was reverse-engineered
   from this machine's actual `~/.claude/projects/` layout, not from public
