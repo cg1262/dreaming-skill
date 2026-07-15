@@ -28,6 +28,7 @@ import argparse
 import json
 import os
 import sys
+from datetime import datetime
 from pathlib import Path
 
 
@@ -135,7 +136,9 @@ def main() -> int:
 
     print(f"transcripts: {len(sessions)} found (most recent first)")
     for p in sessions:
-        print(f"  - {p} (mtime={p.stat().st_mtime:.0f})")
+        mtime = p.stat().st_mtime
+        when = datetime.fromtimestamp(mtime).isoformat(sep=" ", timespec="seconds")
+        print(f"  - {p} (mtime={mtime:.0f}, {when})")
 
     if args.extract:
         for p in sessions:
