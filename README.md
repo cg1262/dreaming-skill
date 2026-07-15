@@ -192,6 +192,30 @@ inspecting this machine and Claude Code's own docs (not assumed):
   (merging, staleness resolution, what counts as a durable insight) is done
   by the invoking agent per the SKILL.md instructions — there is no
   standalone "dream" model or algorithm here.
+- **Extraction is capped, not unbounded.** Both scripts cap extracted text
+  per transcript (`--max-chars-per-file`, default 50000) and across all
+  transcripts combined (`--max-total-chars`, default 200000), so one huge
+  session transcript can't dump megabytes of text and blow past a model's
+  context window. When a cap is hit, an explicit
+  `[... N characters truncated ...]` or `[... total output budget exhausted;
+  remaining transcripts skipped ...]` marker is printed — truncation is never
+  silent or ambiguous with the real end of a transcript. Normal-sized
+  transcripts are well under these defaults and are unaffected; pass the
+  flags explicitly if a given dream needs more (or less) history.
+- **`--limit` is validated.** Both scripts require `--limit` to be a positive
+  integer; `0` or negative values are rejected with a clear argparse error
+  instead of being silently reinterpreted as Python slice semantics (e.g.
+  `--limit -1` used to mean "drop the newest file", not "unlimited").
+- **Unreadable files degrade instead of crashing or vanishing.** If a
+  transcript file can't be opened/read (permission error, deleted mid-run,
+  etc.), that one file's extraction is replaced with a
+  `[unreadable: <path> — <error>]` placeholder and the rest of the run
+  continues normally, rather than the whole script crashing. On the Codex
+  side specifically, a rollout that can't be read or whose `session_meta`
+  line can't be parsed is also no longer silently treated as "doesn't belong
+  to this project" — it's reported as a skipped/unreadable file (via a
+  `warning:` line and a `note:`) so "zero history" and "some history was
+  skipped due to an error" are distinguishable.
 - Claude Code's project-directory encoding (`/` → `-`) was reverse-engineered
   from this machine's actual `~/.claude/projects/` layout, not from public
   docs — if a project path itself happens to contain a literal `-` where a

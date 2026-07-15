@@ -58,9 +58,37 @@ This prints, deterministically (no synthesis):
   model/tool payloads and injected system instructions are stripped for
   readability)
 
+`--limit` must be a positive integer (`0` or negative values are rejected
+with an argparse error, not silently reinterpreted).
+
+**Truncation:** extraction is capped so a single huge transcript can't blow
+past your context window. Each transcript is capped at `--max-chars-per-file`
+(default 50000 characters) and the combined extraction across all transcripts
+is capped at `--max-total-chars` (default 200000 characters); once a file or
+the run as a whole hits its cap, the cut point is marked with an explicit
+`[... N characters truncated ...]` or `[... total output budget exhausted;
+remaining transcripts skipped ...]` line — never silently cut off. Pass
+`--max-chars-per-file N` / `--max-total-chars N` to change the defaults if you
+need more (or less) history for a given dream. Typical small transcripts are
+well under these defaults, so this doesn't change output for normal-sized
+projects.
+
+**Unreadable/corrupt rollouts degrade visibly, not silently:** if a rollout
+file can't be opened, or its `session_meta` line can't be parsed as JSON, the
+script no longer treats it identically to "doesn't belong to this project" —
+it prints a `warning: could not read/parse session file: ...` line (stderr)
+and a `note:` explaining that some session(s) were skipped due to an error,
+so you can tell that apart from genuine zero history. Extraction failures for
+an otherwise-matched file behave like the Claude Code side: a
+`[unreadable: <path> — <error>]` placeholder replaces that one entry instead
+of crashing the run.
+
 If it reports no transcripts found, say so plainly to the user and stop —
 don't fabricate history. This is expected if Codex was never launched with
-this exact directory as its working directory.
+this exact directory as its working directory. If the output also shows a
+`note:` about skipped/unreadable session files, mention that distinction to
+the user too — it means some history may exist but couldn't be checked,
+which is different from there being no history at all.
 
 If `AGENTS.md` doesn't exist yet, that's fine — synthesize purely from the
 transcripts, treating the memory file as starting empty.

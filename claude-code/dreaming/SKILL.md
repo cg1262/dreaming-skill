@@ -54,6 +54,27 @@ This prints, deterministically (no synthesis):
 - extracted plain-text user/assistant turns from each transcript (tool
   calls/results and subagent sidechains are stripped for readability)
 
+`--limit` must be a positive integer (`0` or negative values are rejected
+with an argparse error, not silently reinterpreted).
+
+**Truncation:** extraction is capped so a single huge transcript can't blow
+past your context window. Each transcript is capped at `--max-chars-per-file`
+(default 50000 characters) and the combined extraction across all transcripts
+is capped at `--max-total-chars` (default 200000 characters); once a file or
+the run as a whole hits its cap, the cut point is marked with an explicit
+`[... N characters truncated ...]` or `[... total output budget exhausted;
+remaining transcripts skipped ...]` line — never silently cut off. Pass
+`--max-chars-per-file N` / `--max-total-chars N` to change the defaults if you
+need more (or less) history for a given dream. Typical small transcripts are
+well under these defaults, so this doesn't change output for normal-sized
+projects.
+
+**Unreadable files degrade gracefully:** if a transcript can't be opened or
+read (permission error, deleted mid-run, etc.) the script no longer crashes
+the whole invocation — that one entry is replaced with a
+`[unreadable: <path> — <error>]` placeholder and the remaining transcripts
+are still processed and printed.
+
 If it reports no transcripts found, say so plainly to the user and stop —
 don't fabricate history. This is expected the first time you dream about a
 project that Claude Code has never been launched from directly (transcripts
