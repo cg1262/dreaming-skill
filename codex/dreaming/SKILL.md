@@ -127,5 +127,7 @@ Print a short summary for the user, covering:
 - what new insights were added
 - the exact path of the new dream file
 - explicit next step: *"Review `AGENTS.dream.<ts>.md`. If it looks right,
-  promote it yourself with `mv <path>/AGENTS.dream.<ts>.md <path>/AGENTS.md`.
+  adopt it with `scripts/promote_dream.sh <path>/AGENTS.dream.<ts>.md` (it
+  backs up the current `AGENTS.md` first, then swaps in the dream content) —
+  or promote it yourself with `mv <path>/AGENTS.dream.<ts>.md <path>/AGENTS.md`.
   I won't do this automatically."*

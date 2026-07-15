@@ -124,5 +124,7 @@ Print a short summary for the user, covering:
 - what new insights were added
 - the exact path of the new dream file
 - explicit next step: *"Review `CLAUDE.dream.<ts>.md`. If it looks right,
-  promote it yourself with `mv <path>/CLAUDE.dream.<ts>.md <path>/CLAUDE.md`.
+  adopt it with `scripts/promote_dream.sh <path>/CLAUDE.dream.<ts>.md` (it
+  backs up the current `CLAUDE.md` first, then swaps in the dream content) —
+  or promote it yourself with `mv <path>/CLAUDE.dream.<ts>.md <path>/CLAUDE.md`.
   I won't do this automatically."*
