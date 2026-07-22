@@ -98,21 +98,28 @@ transcript text from step 1. Then produce the new file's content:
 
 ## Step 3: Write the dream file
 
-Write the synthesized result to:
+Reserve the output filename with the bundled helper script — do not
+construct the timestamped filename or check for an existing dream file
+yourself. The script reserves the path atomically (exclusive-create, not a
+check-then-write), so it's guaranteed collision-safe even if two dreams run
+against the same directory at the same moment:
 
+```bash
+if [ -n "${CLAUDE_SKILL_DIR:-}" ]; then
+  SCRIPT="$CLAUDE_SKILL_DIR/scripts/next_dream_path.py"
+else
+  SCRIPT="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/dreaming/scripts/next_dream_path.py"
+fi
+python3 "$SCRIPT" "$project_path" CLAUDE
 ```
-<project_path>/CLAUDE.dream.<YYYYMMDD-HHMMSS>.md
-```
 
-(timestamp = current local time, e.g. `CLAUDE.dream.20260715-143022.md`). Use
-the Write tool, not a shell redirect, so you can review the content first.
-Do **not** write to `CLAUDE.md` itself.
-
-**Never overwrite an existing dream file.** Check whether that exact path
-already exists first (two dreams can run within the same second). If it
-does, disambiguate instead of silently clobbering it — append `-2`, `-3`,
-etc. before `.md` (e.g. `CLAUDE.dream.20260715-143022-2.md`), incrementing
-until the path is free.
+This prints the path of a now-existing, empty, uniquely-reserved file, e.g.
+`<project_path>/CLAUDE.dream.20260715-143022.md` (or
+`CLAUDE.dream.20260715-143022-2.md` if that second was already taken by
+another run). Use the Write tool to write the synthesized content into
+*exactly that path* — not a shell redirect, so you can review the content
+first, and not a path you construct yourself. Do **not** write to
+`CLAUDE.md` itself.
 
 ## Step 4: Report back
 
