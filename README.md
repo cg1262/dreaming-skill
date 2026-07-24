@@ -14,10 +14,15 @@ insights.
 This repo replicates that *pattern* locally, using tools already on this
 machine, for the two memory files these CLIs actually maintain:
 
-| Tool         | Memory file  | Skill location (after install)  |
-|--------------|--------------|----------------------------------|
-| Claude Code  | `CLAUDE.md`  | `~/.claude/skills/dreaming/`     |
-| Codex CLI    | `AGENTS.md`  | `~/.codex/skills/dreaming/`      |
+| Tool         | Memory file(s)          | Skill location (after install)  |
+|--------------|-------------------------|----------------------------------|
+| Claude Code  | `CLAUDE.md`, `AGENTS.md`| `~/.claude/skills/dreaming/`     |
+| Codex CLI    | `AGENTS.md`             | `~/.codex/skills/dreaming/`      |
+
+Claude Code loads both `CLAUDE.md` and `AGENTS.md` at a project root as memory,
+so its dreaming skill consolidates whichever one(s) exist — each into its own
+`<base>.dream.<timestamp>.md` (`CLAUDE.md` → `CLAUDE.dream.…`, `AGENTS.md` →
+`AGENTS.dream.…`), never merging the two source files into each other.
 
 ### How it differs from the real "dreams" feature
 
@@ -154,18 +159,26 @@ inspecting this machine and Claude Code's own docs (not assumed):
   latter (`arguments: [project_path, instructions]`). Bundled `scripts/` /
   `references/` directories are a real, standard convention.
 
+- **Claude Code reads both `CLAUDE.md` and `AGENTS.md`** at a project root as
+  memory, so `find_claude_project.py` reports whichever of the two exist and
+  the skill consolidates each into its own `<base>.dream.<timestamp>.md`. Many
+  repos keep their agent instructions in `AGENTS.md` and have no `CLAUDE.md` at
+  all, so looking only for `CLAUDE.md` would report "no memory file" on a
+  project that clearly has one.
+
 - **Claude Code session transcripts** live at
   `~/.claude/projects/<encoded-cwd>/<session-uuid>.jsonl`, one directory per
   project, one JSONL file per session. `<encoded-cwd>` is the project's
-  absolute path with every `/` replaced by `-` (e.g. `/home/cgamb/foo` →
-  `-home-cgamb-foo`) — confirmed empirically on this machine (not documented
-  publicly as far as I could verify, so `find_claude_project.py` fails
-  loudly rather than guessing further if the computed directory doesn't
-  exist). Each line is a JSON event; `type: "user"` / `type: "assistant"`
-  lines carry the actual conversation (`message.content`, either a plain
-  string or a list of typed blocks — `text`, `tool_use`, `tool_result`,
-  `thinking`); `isSidechain: true` marks subagent-internal turns, which the
-  helper script skips.
+  absolute path with **every non-alphanumeric character** replaced by `-`
+  (e.g. `/Users/scott.haines/foo` → `-Users-scott-haines-foo`, where both `/`
+  and the `.` in the username become `-`) — confirmed empirically on this
+  machine (not documented publicly as far as I could verify, so
+  `find_claude_project.py` fails loudly rather than guessing further if the
+  computed directory doesn't exist). Each line is a JSON event; `type: "user"`
+  / `type: "assistant"` lines carry the actual conversation (`message.content`,
+  either a plain string or a list of typed blocks — `text`, `tool_use`,
+  `tool_result`, `thinking`); `isSidechain: true` marks subagent-internal
+  turns, which the helper script skips.
 
 - **Codex CLI has a real, first-class skill mechanism** at
   `$CODEX_HOME/skills/<name>/SKILL.md` (`~/.codex/skills` by default) — the
@@ -221,10 +234,10 @@ inspecting this machine and Claude Code's own docs (not assumed):
   judgment (merging, staleness resolution, what counts as a durable insight)
   is done by the invoking agent per the SKILL.md instructions — there is no
   standalone "dream" model or algorithm here.
-- Claude Code's project-directory encoding (`/` → `-`) was reverse-engineered
-  from this machine's actual `~/.claude/projects/` layout, not from public
-  docs — if a project path itself happens to contain a literal `-` where a
-  `/` also got substituted, the mapping is not perfectly invertible, but the
+- Claude Code's project-directory encoding (every non-alphanumeric character →
+  `-`) was reverse-engineered from this machine's actual `~/.claude/projects/`
+  layout, not from public docs — because several distinct characters (`/`, `.`,
+  `-`, …) all collapse to `-`, the mapping is not perfectly invertible, but the
   forward direction (path → directory name) used here is unambiguous and is
   what matters for lookup.
 - On this machine, most Claude Code sessions were run with the process's cwd
