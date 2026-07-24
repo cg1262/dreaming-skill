@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -39,8 +40,15 @@ def claude_home() -> Path:
 
 
 def encode_project_path(abs_path: Path) -> str:
-    """Replicate Claude Code's project directory naming: '/' -> '-'."""
-    return str(abs_path).replace(os.sep, "-")
+    """Replicate Claude Code's project directory naming.
+
+    Claude Code sanitizes the absolute cwd into a single directory name by
+    replacing every character that isn't alphanumeric with '-'. In practice
+    that means both the path separator '/' and '.' (e.g. in a username like
+    'scott.haines') become '-': /Users/scott.haines/foo ->
+    -Users-scott-haines-foo. Confirmed empirically on this machine.
+    """
+    return re.sub(r"[^A-Za-z0-9]", "-", str(abs_path))
 
 
 def find_memory_file(project_dir: Path) -> Path | None:
