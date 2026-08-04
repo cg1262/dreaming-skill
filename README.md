@@ -47,9 +47,9 @@ so its dreaming skill consolidates whichever one(s) exist — each into its own
   instructions like any other skill. There's no separate dedicated model or
   hosted pipeline behind this.
 - **Reports include computed evidence, not just a model summary.** After writing
-  the dream file, the skill runs a small deterministic diff helper against the
-  original memory file and includes the literal unified diff in the report. If
-  the original memory file does not exist yet, the diff uses an empty baseline;
+  the dream file, the skill runs a real `diff -u` against the original memory
+  file and includes that literal unified diff in the report. If the original
+  memory file does not exist yet, the diff uses an empty `/dev/null` baseline;
   very large diffs are capped with an explicit truncation note.
 - **The "locate transcripts" step is a small deterministic script**, not a
   model call — see [Mechanism notes](#mechanism-notes) for why, and exactly
