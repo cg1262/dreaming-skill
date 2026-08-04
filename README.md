@@ -14,15 +14,16 @@ insights.
 This repo replicates that *pattern* locally, using tools already on this
 machine, for the two memory files these CLIs actually maintain:
 
-| Tool         | Memory file(s)          | Skill location (after install)  |
-|--------------|-------------------------|----------------------------------|
-| Claude Code  | `CLAUDE.md`, `AGENTS.md`| `~/.claude/skills/dreaming/`     |
-| Codex CLI    | `AGENTS.md`             | `~/.codex/skills/dreaming/`      |
+| Tool         | Memory file  | Skill location (after install)  |
+|--------------|--------------|----------------------------------|
+| Claude Code  | `CLAUDE.md`  | `~/.claude/skills/dreaming/`     |
+| Codex CLI    | `AGENTS.md`  | `~/.codex/skills/dreaming/`      |
 
-Claude Code loads both `CLAUDE.md` and `AGENTS.md` at a project root as memory,
-so its dreaming skill consolidates whichever one(s) exist — each into its own
-`<base>.dream.<timestamp>.md` (`CLAUDE.md` → `CLAUDE.dream.…`, `AGENTS.md` →
-`AGENTS.dream.…`), never merging the two source files into each other.
+Claude Code's current docs say it reads `CLAUDE.md`, not `AGENTS.md`. If a
+repository already uses `AGENTS.md` for other coding agents, create a
+`CLAUDE.md` that imports it (`@AGENTS.md`) or symlink `CLAUDE.md` to
+`AGENTS.md`; the Claude dreaming skill still writes a `CLAUDE.dream.*.md`
+proposal rather than treating `AGENTS.md` as additional native Claude memory.
 
 ### How it differs from the real "dreams" feature
 
@@ -42,9 +43,9 @@ so its dreaming skill consolidates whichever one(s) exist — each into its own
   instructions like any other skill. There's no separate dedicated model or
   hosted pipeline behind this.
 - **Reports include computed evidence, not just a model summary.** After writing
-  the dream file, the skill runs a real `diff -u` against the original memory
-  file and includes that literal unified diff in the report. If the original
-  memory file does not exist yet, the diff uses an empty `/dev/null` baseline;
+  the dream file, the skill runs a small deterministic diff helper against the
+  original memory file and includes the literal unified diff in the report. If
+  the original memory file does not exist yet, the diff uses an empty baseline;
   very large diffs are capped with an explicit truncation note.
 - **The "locate transcripts" step is a small deterministic script**, not a
   model call — see [Mechanism notes](#mechanism-notes) for why, and exactly
@@ -59,6 +60,8 @@ dreaming-skill/
 ├── scripts/
 │   ├── find_claude_project.py       # locate CLAUDE.md + recent transcripts
 │   ├── find_codex_project.py        # locate AGENTS.md + recent transcripts
+│   ├── dream_diff.py                # computed unified diff for review reports
+│   ├── next_dream_path.py           # atomically reserve a unique dream filename
 │   └── promote_dream.sh             # adopt a reviewed dream file (see below)
 ├── claude-code/
 │   └── dreaming/
@@ -119,6 +122,15 @@ Replaced: "uses npm" -> "uses pnpm" (contradicted in the 2026-07-11 session
   where the build was migrated).
 Added: "OG images are generated at build time via Satori, not client-side."
 Wrote: /home/cgamb/gambill-data-website/CLAUDE.dream.20260715-143022.md
+
+Computed diff:
+--- /home/cgamb/gambill-data-website/CLAUDE.md
++++ /home/cgamb/gambill-data-website/CLAUDE.dream.20260715-143022.md
+@@ -1,3 +1,3 @@
+ # Project memory
+-Uses npm for package scripts.
++Uses pnpm for package scripts.
+ OG images are generated at build time via Satori, not client-side.
 
 Review it, then adopt it if it looks right:
   scripts/promote_dream.sh CLAUDE.dream.20260715-143022.md
@@ -188,12 +200,13 @@ inspecting this machine and Claude Code's own docs (not assumed):
   latter (`arguments: [project_path, instructions]`). Bundled `scripts/` /
   `references/` directories are a real, standard convention.
 
-- **Claude Code reads both `CLAUDE.md` and `AGENTS.md`** at a project root as
-  memory, so `find_claude_project.py` reports whichever of the two exist and
-  the skill consolidates each into its own `<base>.dream.<timestamp>.md`. Many
-  repos keep their agent instructions in `AGENTS.md` and have no `CLAUDE.md` at
-  all, so looking only for `CLAUDE.md` would report "no memory file" on a
-  project that clearly has one.
+- **Claude Code reads `CLAUDE.md`, not `AGENTS.md`, as native project memory.**
+  Its current memory docs recommend importing an existing `AGENTS.md` from
+  `CLAUDE.md` (for example, `@AGENTS.md`) or symlinking `CLAUDE.md` to
+  `AGENTS.md` when you want both Claude Code and other agents to share the same
+  instructions. For that reason, `find_claude_project.py` reports `CLAUDE.md`
+  and the Claude dreaming skill writes `CLAUDE.dream.*.md`; it does not create
+  a separate `AGENTS.dream.*.md` on Claude Code's behalf.
 
 - **Claude Code session transcripts** live at
   `~/.claude/projects/<encoded-cwd>/<session-uuid>.jsonl`, one directory per
@@ -255,14 +268,15 @@ inspecting this machine and Claude Code's own docs (not assumed):
 
 ## Limitations / things to know
 
-- `find_claude_project.py` and `find_codex_project.py` are read-only and
-  mechanical: they locate files and strip transcripts down to plain
-  conversational text. `next_dream_path.py` has exactly one side effect — it
-  creates the single empty file whose path it prints, to hold its atomic
-  reservation. None of the three scripts do any summarization: all actual
-  judgment (merging, staleness resolution, what counts as a durable insight)
-  is done by the invoking agent per the SKILL.md instructions — there is no
-  standalone "dream" model or algorithm here.
+- `find_claude_project.py`, `find_codex_project.py`, and `dream_diff.py` are
+  read-only and mechanical: they locate files, strip transcripts down to plain
+  conversational text, or print a computed diff. `next_dream_path.py` has
+  exactly one side effect — it creates the single empty file whose path it
+  prints, to hold its atomic reservation. `promote_dream.sh` changes a memory
+  file only when you run it yourself after review. None of the scripts do any
+  summarization: all actual judgment (merging, staleness resolution, what
+  counts as a durable insight) is done by the invoking agent per the SKILL.md
+  instructions — there is no standalone "dream" model or algorithm here.
 - Claude Code's project-directory encoding (every non-alphanumeric character →
   `-`) was reverse-engineered from this machine's actual `~/.claude/projects/`
   layout, not from public docs — because several distinct characters (`/`, `.`,

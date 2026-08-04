@@ -1,13 +1,9 @@
 #!/usr/bin/env python3
-"""Locate a Claude Code project's memory file(s) and recent session transcripts.
+"""Locate a Claude Code project's memory file and recent session transcripts.
 
 Mechanical/deterministic only: this script does not summarize, merge, or
 judge staleness. It finds files and extracts plain-text turns so an agent
 can read them.
-
-Claude Code loads both CLAUDE.md and AGENTS.md at a project root as memory, so
-this reports whichever of the two exist (many repos keep their agent
-instructions in AGENTS.md and have no CLAUDE.md).
 
 Claude Code stores per-project session transcripts under:
     ~/.claude/projects/<encoded-cwd>/<session-uuid>.jsonl
@@ -82,24 +78,9 @@ def encode_project_path(abs_path: Path) -> str:
     return re.sub(r"[^A-Za-z0-9]", "-", str(abs_path))
 
 
-# Agent-memory files Claude Code reads at a project root, in preference order.
-# Claude Code loads both CLAUDE.md and AGENTS.md as project memory, so a project
-# may use either or both; many repos keep their agent instructions in AGENTS.md
-# and have no CLAUDE.md at all.
-MEMORY_FILENAMES = ("CLAUDE.md", "AGENTS.md")
-
-
-def find_memory_files(project_dir: Path) -> list[Path]:
-    """Return the agent-memory files present at the project root, if any.
-
-    Looks for both CLAUDE.md and AGENTS.md (in that order) so the skill can
-    consolidate whichever one(s) a project actually maintains.
-    """
-    return [
-        candidate
-        for name in MEMORY_FILENAMES
-        if (candidate := project_dir / name).is_file()
-    ]
+def find_memory_file(project_dir: Path) -> Path | None:
+    candidate = project_dir / "CLAUDE.md"
+    return candidate if candidate.is_file() else None
 
 
 def list_transcripts(project_transcript_dir: Path, limit: int) -> list[Path]:
@@ -187,12 +168,11 @@ def main() -> int:
     print(f"claude_home: {home}")
     print(f"encoded_project_dir: {project_transcript_dir}")
 
-    memory_files = find_memory_files(project_dir)
-    if memory_files:
-        for mf in memory_files:
-            print(f"memory_file: {mf}")
+    memory_file = find_memory_file(project_dir)
+    if memory_file:
+        print(f"memory_file: {memory_file}")
     else:
-        print("memory_file: (none found - no CLAUDE.md or AGENTS.md at project root)")
+        print("memory_file: (none found - no CLAUDE.md at project root)")
 
     transcripts = list_transcripts(project_transcript_dir, args.limit)
     if not transcripts:
