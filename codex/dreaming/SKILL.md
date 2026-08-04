@@ -129,31 +129,63 @@ transcript text from step 1. Then produce the new file's content:
 
 ## Step 3: Write the dream file
 
-Write the synthesized result to:
+Reserve the output filename with the bundled helper script — do not
+construct the timestamped filename or check for an existing dream file
+yourself. The script reserves the path atomically (exclusive-create, not a
+check-then-write), so it's guaranteed collision-safe even if two dreams run
+against the same directory at the same moment:
 
+```bash
+if [ -n "${CODEX_HOME:-}" ]; then
+  SCRIPT="$CODEX_HOME/skills/dreaming/scripts/next_dream_path.py"
+else
+  SCRIPT="$HOME/.codex/skills/dreaming/scripts/next_dream_path.py"
+fi
+python3 "$SCRIPT" "<project_dir>" AGENTS
 ```
-<project_dir>/AGENTS.dream.<YYYYMMDD-HHMMSS>.md
-```
 
-(timestamp = current local time, e.g. `AGENTS.dream.20260715-143022.md`).
-Write the file directly so you can review the content before finishing. Do
-**not** write to `AGENTS.md` itself.
-
-**Never overwrite an existing dream file.** Check whether that exact path
-already exists first (two dreams can run within the same second). If it
-does, disambiguate instead of silently clobbering it — append `-2`, `-3`,
-etc. before `.md` (e.g. `AGENTS.dream.20260715-143022-2.md`), incrementing
-until the path is free.
+This prints the path of a now-existing, empty, uniquely-reserved file, e.g.
+`<project_dir>/AGENTS.dream.20260715-143022.md` (or
+`AGENTS.dream.20260715-143022-2.md` if that second was already taken by
+another run). Write the synthesized content into *exactly that path* — not
+a path you construct yourself — so you can review the content before
+finishing. Do **not** write to `AGENTS.md` itself.
 
 ## Step 4: Report back
 
-Print a short summary for the user, covering:
+Print a short prose summary for the user, covering:
 - how many transcripts were read and over what time span
 - what was merged (duplicate groups collapsed)
 - what was replaced/updated as stale, and why (cite the contradicting
   transcript if relevant)
 - what new insights were added
+
+Then run the bundled diff helper and include its literal, computed output in
+the user-facing report. Set `ORIGINAL_MEMORY_FILE` to the `AGENTS.md` path
+from Step 1, even if it did not exist, and set `DREAM_FILE` to the new dream
+file path from Step 3. Resolve the script path the same way as the other
+helpers:
+
+```bash
+if [ -n "${CODEX_HOME:-}" ]; then
+  DIFF_SCRIPT="$CODEX_HOME/skills/dreaming/scripts/dream_diff.py"
+else
+  DIFF_SCRIPT="$HOME/.codex/skills/dreaming/scripts/dream_diff.py"
+fi
+python3 "$DIFF_SCRIPT" "$ORIGINAL_MEMORY_FILE" "$DREAM_FILE"
+```
+
+Show that output under a `Computed diff` heading as a fenced `diff` block. Do
+not paraphrase or alter it except for the truncation already performed by the
+helper. The helper treats a missing original as an empty baseline, prints
+`(diff produced no output; files are identical)` when there is no diff, and
+exits non-zero only for real errors such as a missing dream file or unreadable
+input.
+
+The final report must also include:
 - the exact path of the new dream file
 - explicit next step: *"Review `AGENTS.dream.<ts>.md`. If it looks right,
-  promote it yourself with `mv <path>/AGENTS.dream.<ts>.md <path>/AGENTS.md`.
+  adopt it with `scripts/promote_dream.sh <path>/AGENTS.dream.<ts>.md` (it
+  backs up the current `AGENTS.md` first, then swaps in the dream content) —
+  or promote it yourself with `mv <path>/AGENTS.dream.<ts>.md <path>/AGENTS.md`.
   I won't do this automatically."*
