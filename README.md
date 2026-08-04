@@ -37,11 +37,6 @@ so its dreaming skill consolidates whichever one(s) exist — each into its own
   `CLAUDE.dream.<timestamp>.md` / `AGENTS.dream.<timestamp>.md` file. You
   review it and then adopt it yourself — with `scripts/promote_dream.sh` (see
   [Adopting a dream](#adopting-a-dream)) or by hand — or delete it.
-- **The dream filename is reserved atomically, not just picked by the
-  model.** Choosing *which* new filename to write to is a small deterministic
-  script (`next_dream_path.py`), not a check-then-write prompt instruction —
-  see [Mechanism notes](#mechanism-notes) for exactly what guarantee that
-  does and doesn't provide.
 - **The synthesis is done by whichever agent runs the skill** (Claude Code or
   Codex, using their normal model + normal judgment) — reading the SKILL.md's
   instructions like any other skill. There's no separate dedicated model or
@@ -64,8 +59,6 @@ dreaming-skill/
 ├── scripts/
 │   ├── find_claude_project.py       # locate CLAUDE.md + recent transcripts
 │   ├── find_codex_project.py        # locate AGENTS.md + recent transcripts
-│   ├── dream_diff.py                # computed unified diff for review reports
-│   ├── next_dream_path.py           # atomically reserve a unique dream filename
 │   └── promote_dream.sh             # adopt a reviewed dream file (see below)
 ├── claude-code/
 │   └── dreaming/
@@ -126,15 +119,6 @@ Replaced: "uses npm" -> "uses pnpm" (contradicted in the 2026-07-11 session
   where the build was migrated).
 Added: "OG images are generated at build time via Satori, not client-side."
 Wrote: /home/cgamb/gambill-data-website/CLAUDE.dream.20260715-143022.md
-
-Computed diff:
---- /home/cgamb/gambill-data-website/CLAUDE.md
-+++ /home/cgamb/gambill-data-website/CLAUDE.dream.20260715-143022.md
-@@ -1,3 +1,3 @@
- # Project memory
--Uses npm for package scripts.
-+Uses pnpm for package scripts.
- OG images are generated at build time via Satori, not client-side.
 
 Review it, then adopt it if it looks right:
   scripts/promote_dream.sh CLAUDE.dream.20260715-143022.md
