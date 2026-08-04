@@ -160,33 +160,19 @@ Print a short prose summary for the user, covering:
   transcript if relevant)
 - what new insights were added
 
-Then run a real unified diff and include its literal, computed output in the
-user-facing report. Set `ORIGINAL_MEMORY_FILE` to the `AGENTS.md` path from
-Step 1, even if it did not exist, and set `DREAM_FILE` to the new dream file
-path from Step 3. Run exactly this shell step:
+Then run the bundled diff helper and include its literal, computed output in
+the user-facing report. Set `ORIGINAL_MEMORY_FILE` to the `AGENTS.md` path
+from Step 1, even if it did not exist, and set `DREAM_FILE` to the new dream
+file path from Step 3. Resolve the script path the same way as the other
+helpers:
 
 ```bash
-DIFF_TMP="$(mktemp)"
-if [ -f "$ORIGINAL_MEMORY_FILE" ]; then
-  diff -u -- "$ORIGINAL_MEMORY_FILE" "$DREAM_FILE" > "$DIFF_TMP" || true
+if [ -n "${CODEX_HOME:-}" ]; then
+  DIFF_SCRIPT="$CODEX_HOME/skills/dreaming/scripts/dream_diff.py"
 else
-  diff -u \
-    --label "$ORIGINAL_MEMORY_FILE (missing; empty baseline)" \
-    --label "$DREAM_FILE" \
-    /dev/null "$DREAM_FILE" > "$DIFF_TMP" || true
+  DIFF_SCRIPT="$HOME/.codex/skills/dreaming/scripts/dream_diff.py"
 fi
-
-DIFF_LIMIT_BYTES=20000
-DIFF_BYTES="$(wc -c < "$DIFF_TMP" | tr -d ' ')"
-if [ "$DIFF_BYTES" -eq 0 ]; then
-  printf '%s\n' '(diff produced no output; files are identical)'
-elif [ "$DIFF_BYTES" -le "$DIFF_LIMIT_BYTES" ]; then
-  cat "$DIFF_TMP"
-else
-  head -c "$DIFF_LIMIT_BYTES" "$DIFF_TMP"
-  printf '\n[diff truncated: %s bytes total, showing first %s bytes]\n' "$DIFF_BYTES" "$DIFF_LIMIT_BYTES"
-fi
-rm -f "$DIFF_TMP"
+python3 "$DIFF_SCRIPT" "$ORIGINAL_MEMORY_FILE" "$DREAM_FILE"
 ```
 
 Show that output under a `Computed diff` heading as a fenced `diff` block. Do

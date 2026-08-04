@@ -90,6 +90,33 @@ class FindClaudeProjectTests(unittest.TestCase):
         self.assertIn("[assistant]\nbuild command is make site", result.stdout)
         self.assertNotIn("sidechain text", result.stdout)
 
+    def test_does_not_treat_agents_md_as_claude_memory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            project = root / "project"
+            project.mkdir()
+            (project / "AGENTS.md").write_text("# Shared Memory\n", encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    "python3",
+                    str(SCRIPTS_DIR / "find_claude_project.py"),
+                    str(project),
+                    "--claude-home",
+                    str(root / "claude-home"),
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(
+            "memory_file: (none found - no CLAUDE.md at project root)",
+            result.stdout,
+        )
+        self.assertNotIn("AGENTS.md", result.stdout)
+
     def test_rejects_non_positive_limit_and_marks_unreadable_extract(self) -> None:
         module = load_script_module("find_claude_project_for_error_test", "find_claude_project.py")
         result = subprocess.run(
