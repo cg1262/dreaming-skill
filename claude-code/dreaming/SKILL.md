@@ -54,6 +54,27 @@ This prints, deterministically (no synthesis):
 - extracted plain-text user/assistant turns from each transcript (tool
   calls/results and subagent sidechains are stripped for readability)
 
+`--limit` must be a positive integer (`0` or negative values are rejected
+with an argparse error, not silently reinterpreted).
+
+**Truncation:** extraction is capped so a single huge transcript can't blow
+past your context window. Each transcript is capped at `--max-chars-per-file`
+(default 50000 characters) and the combined extraction across all transcripts
+is capped at `--max-total-chars` (default 200000 characters); once a file or
+the run as a whole hits its cap, the cut point is marked with an explicit
+`[... N characters truncated ...]` or `[... total output budget exhausted;
+remaining transcripts skipped ...]` line — never silently cut off. Pass
+`--max-chars-per-file N` / `--max-total-chars N` to change the defaults if you
+need more (or less) history for a given dream. Typical small transcripts are
+well under these defaults, so this doesn't change output for normal-sized
+projects.
+
+**Unreadable files degrade gracefully:** if a transcript can't be opened or
+read (permission error, deleted mid-run, etc.) the script no longer crashes
+the whole invocation — that one entry is replaced with a
+`[unreadable: <path> — <error>]` placeholder and the remaining transcripts
+are still processed and printed.
+
 If it reports no transcripts found, say so plainly to the user and stop —
 don't fabricate history. This is expected the first time you dream about a
 project that Claude Code has never been launched from directly (transcripts
@@ -123,13 +144,39 @@ first, and not a path you construct yourself. Do **not** write to
 
 ## Step 4: Report back
 
-Print a short summary for the user, covering:
+Print a short prose summary for the user, covering:
 - how many transcripts were read and over what time span
 - what was merged (duplicate groups collapsed)
 - what was replaced/updated as stale, and why (cite the contradicting
   transcript if relevant)
 - what new insights were added
+
+Then run the bundled diff helper and include its literal, computed output in
+the user-facing report. Set `ORIGINAL_MEMORY_FILE` to the `CLAUDE.md` path
+from Step 1, even if it did not exist, and set `DREAM_FILE` to the new dream
+file path from Step 3. Resolve the script path the same way as the other
+helpers:
+
+```bash
+if [ -n "${CLAUDE_SKILL_DIR:-}" ]; then
+  DIFF_SCRIPT="$CLAUDE_SKILL_DIR/scripts/dream_diff.py"
+else
+  DIFF_SCRIPT="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/dreaming/scripts/dream_diff.py"
+fi
+python3 "$DIFF_SCRIPT" "$ORIGINAL_MEMORY_FILE" "$DREAM_FILE"
+```
+
+Show that output under a `Computed diff` heading as a fenced `diff` block. Do
+not paraphrase or alter it except for the truncation already performed by the
+helper. The helper treats a missing original as an empty baseline, prints
+`(diff produced no output; files are identical)` when there is no diff, and
+exits non-zero only for real errors such as a missing dream file or unreadable
+input.
+
+The final report must also include:
 - the exact path of the new dream file
 - explicit next step: *"Review `CLAUDE.dream.<ts>.md`. If it looks right,
-  promote it yourself with `mv <path>/CLAUDE.dream.<ts>.md <path>/CLAUDE.md`.
+  adopt it with `scripts/promote_dream.sh <path>/CLAUDE.dream.<ts>.md` (it
+  backs up the current `CLAUDE.md` first, then swaps in the dream content) —
+  or promote it yourself with `mv <path>/CLAUDE.dream.<ts>.md <path>/CLAUDE.md`.
   I won't do this automatically."*
