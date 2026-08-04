@@ -35,7 +35,8 @@ so its dreaming skill consolidates whichever one(s) exist — each into its own
   here that's an absolute, hard-coded rule: the skill is instructed to never
   write to `CLAUDE.md`/`AGENTS.md`, only to a new
   `CLAUDE.dream.<timestamp>.md` / `AGENTS.dream.<timestamp>.md` file. You
-  promote it yourself (`mv CLAUDE.dream.<ts>.md CLAUDE.md`) or delete it.
+  review it and then adopt it yourself — with `scripts/promote_dream.sh` (see
+  [Adopting a dream](#adopting-a-dream)) or by hand — or delete it.
 - **The dream filename is reserved atomically, not just picked by the
   model.** Choosing *which* new filename to write to is a small deterministic
   script (`next_dream_path.py`), not a check-then-write prompt instruction —
@@ -45,6 +46,11 @@ so its dreaming skill consolidates whichever one(s) exist — each into its own
   Codex, using their normal model + normal judgment) — reading the SKILL.md's
   instructions like any other skill. There's no separate dedicated model or
   hosted pipeline behind this.
+- **Reports include computed evidence, not just a model summary.** After writing
+  the dream file, the skill runs a small deterministic diff helper against the
+  original memory file and includes the literal unified diff in the report. If
+  the original memory file does not exist yet, the diff uses an empty baseline;
+  very large diffs are capped with an explicit truncation note.
 - **The "locate transcripts" step is a small deterministic script**, not a
   model call — see [Mechanism notes](#mechanism-notes) for why, and exactly
   what it does and doesn't do.
@@ -58,7 +64,9 @@ dreaming-skill/
 ├── scripts/
 │   ├── find_claude_project.py       # locate CLAUDE.md + recent transcripts
 │   ├── find_codex_project.py        # locate AGENTS.md + recent transcripts
-│   └── next_dream_path.py           # atomically reserve a unique dream filename
+│   ├── dream_diff.py                # computed unified diff for review reports
+│   ├── next_dream_path.py           # atomically reserve a unique dream filename
+│   └── promote_dream.sh             # adopt a reviewed dream file (see below)
 ├── claude-code/
 │   └── dreaming/
 │       ├── SKILL.md                 # -> ~/.claude/skills/dreaming/SKILL.md
@@ -69,10 +77,10 @@ dreaming-skill/
         └── scripts -> ../../scripts  (symlink)
 ```
 
-Both `SKILL.md` files reference the same three helper scripts (via a symlink
+Both `SKILL.md` files reference the same shared helper scripts (via a symlink
 into the shared `scripts/` directory) so there's one implementation of the
-mechanical lookup and filename-reservation logic, not two copies to keep in
-sync.
+mechanical lookup, filename-reservation, diff, and promotion logic, not two
+copies to keep in sync.
 
 ## Install
 
@@ -119,8 +127,17 @@ Replaced: "uses npm" -> "uses pnpm" (contradicted in the 2026-07-11 session
 Added: "OG images are generated at build time via Satori, not client-side."
 Wrote: /home/cgamb/gambill-data-website/CLAUDE.dream.20260715-143022.md
 
-Review it, then promote manually if it looks right:
-  mv CLAUDE.dream.20260715-143022.md CLAUDE.md
+Computed diff:
+--- /home/cgamb/gambill-data-website/CLAUDE.md
++++ /home/cgamb/gambill-data-website/CLAUDE.dream.20260715-143022.md
+@@ -1,3 +1,3 @@
+ # Project memory
+-Uses npm for package scripts.
++Uses pnpm for package scripts.
+ OG images are generated at build time via Satori, not client-side.
+
+Review it, then adopt it if it looks right:
+  scripts/promote_dream.sh CLAUDE.dream.20260715-143022.md
 ```
 
 ### Codex CLI
@@ -142,6 +159,34 @@ $ cd ~/some-project && codex
 Codex will read the skill's description, trigger it, run the same helper
 script, synthesize, and write `AGENTS.dream.<timestamp>.md` — never touching
 `AGENTS.md`.
+
+## Adopting a dream
+
+Once you've reviewed a dream file and decide it looks right, the recommended
+way to adopt it is `scripts/promote_dream.sh`, not a manual `mv`:
+
+```bash
+scripts/promote_dream.sh CLAUDE.dream.20260715-143022.md
+# or, if the dream filename doesn't follow the <name>.dream.<timestamp>.md
+# convention and the original path can't be inferred:
+scripts/promote_dream.sh some-dream-file.md CLAUDE.md
+```
+
+It infers the original file's path from the dream filename (stripping the
+`.dream.<timestamp>` segment, e.g. `CLAUDE.dream.20260715-143022.md` ->
+`CLAUDE.md` in the same directory) unless you pass the original's path
+explicitly as a second argument. Before changing anything, it backs up the
+current original to `<original>.bak.<timestamp>` (skipped with a warning if
+there is no existing original yet — expected for a project's first-ever
+dream), then atomically replaces the original with the dream file's content
+and prints a summary of what it did. It refuses safely (non-zero exit, no
+changes made) if the dream file doesn't exist or the original path can't be
+determined.
+
+You can still discard a dream file instead (just delete it), or promote it by
+hand if you prefer — the script only automates the mechanical, error-prone
+parts (backup + atomic swap), the same way the locator scripts automate
+lookup while leaving synthesis judgment to you.
 
 ## Mechanism notes
 
